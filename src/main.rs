@@ -245,7 +245,7 @@ async fn main() {
     }
     let slice_cats: &[(u32, u32)] = cats.as_slice();
 
-    let thread_count: i32 = get_int_from_user("Enter total threads to use (default 8):", Some(8));
+    let thread_count: i32 = get_int_from_user("Enter total threads to use (default 8): ", Some(8));
 
     println!("\nFinding seed...");
     let start: Instant = Instant::now();
