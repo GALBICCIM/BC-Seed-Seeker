@@ -3,14 +3,22 @@ mod gatya_data;
 
 use std::{io::Write, time::Instant};
 
+const MODULUS: u32 = 10000;
+const BLANK_SLOT: u32 = 20;
+const IGNORE_SLOT: u32 = 21;
+const BLANK_SLOT_USER: i32 = -2;
+
 async fn get_event_data(cc: &str, force: bool) -> String {
     let file_path: String = format!("data/gatya_{}.tsv", cc);
+
     if std::path::Path::new(&file_path).exists() && !force {
         let data: String = std::fs::read_to_string(file_path).unwrap();
         return data;
     }
+
     let data = event_data::get_event_data(cc).await;
     std::fs::write(file_path, data.clone()).unwrap();
+
     data
 }
 
@@ -19,6 +27,7 @@ fn get_int_from_user(prompt: &str, default: Option<i32>) -> i32 {
     std::io::stdout().flush().unwrap();
 
     let mut input: String = String::new();
+
     std::io::stdin().read_line(&mut input).unwrap();
 
     let input: i32 = match input.trim().parse() {
@@ -31,11 +40,13 @@ fn get_int_from_user(prompt: &str, default: Option<i32>) -> i32 {
             }
         },
     };
+
     input
 }
 
 fn ask_if_want_to_update_data() -> bool {
     let input: i32 = get_int_from_user("Update Game Data? (1 for yes, 2 for no): ", None);
+
     match input {
         1 => true,
         2 => false,
@@ -59,10 +70,10 @@ async fn select_event(cc: &str) -> (gatya_data::GatyaEvent, bool) {
         .iter()
         .filter(|gatya_event| !gatya_event.banner_txt.is_empty())
         .collect();
+
     for (i, gatya_event) in valid_events.iter().enumerate() {
         let start_time: String = gatya_event.start.clone();
         let end_time: String = gatya_event.end.clone();
-
         let start_time_parsed: String = format!(
             "{}-{}-{}",
             &start_time[0..4],
@@ -75,6 +86,7 @@ async fn select_event(cc: &str) -> (gatya_data::GatyaEvent, bool) {
             &end_time[4..6],
             &end_time[6..8]
         );
+
         println!(
             "{}. {} - {}: {}",
             i + 1,
@@ -83,13 +95,17 @@ async fn select_event(cc: &str) -> (gatya_data::GatyaEvent, bool) {
             gatya_event.banner_txt
         );
     }
+
     let mut input: i32;
+
     loop {
         input = get_int_from_user("Select event: ", None);
+
         if input < 1 || input > valid_events.len() as i32 {
             println!("Invalid input. Try again.");
             continue;
         }
+
         break;
     }
 
@@ -106,6 +122,7 @@ fn select_cc() -> String {
     println!("4. Taiwanese");
     // validate input
     let input: i32 = get_int_from_user("Select country code: ", None);
+
     match input {
         1 => "en".to_string(),
         2 => "jp".to_string(),
@@ -143,6 +160,7 @@ fn select_cats() -> Vec<i32> {
 
     if cats_ids.is_empty() {
         println!("No cats entered. Try again.");
+
         return select_cats();
     }
 
@@ -152,11 +170,8 @@ fn select_cats() -> Vec<i32> {
 fn select_rarities() -> Vec<i32> {
     let mut rarities: Vec<i32> = Vec::new();
     let mut counter: u32 = 0;
-    println!("Rarities:");
-    println!("1. Rare");
-    println!("2. Super Rare");
-    println!("3. Uber Rare");
-    println!("4. Legend Rare");
+    println!("Rarities:\n1. Rare\n2. Super Rare\n3. Uber Rare\n4. Legend Rare");
+
     loop {
         let rarity: i32 = get_int_from_user(
             &format!(
@@ -166,20 +181,24 @@ fn select_rarities() -> Vec<i32> {
             ),
             None,
         );
+
         if rarity == -1 {
             break;
         }
+
         if rarity == BLANK_SLOT_USER {
             rarities.push(BLANK_SLOT as i32);
             counter += 1;
             continue;
         }
+
         rarities.push(rarity - 1_i32);
         counter += 1;
     }
 
     if rarities.is_empty() {
         println!("No rarities entered. Try again.");
+
         return select_rarities();
     }
 
@@ -188,8 +207,6 @@ fn select_rarities() -> Vec<i32> {
 
 fn get_cat_slots(gatya_slot_data: Vec<Vec<i32>>, total_rares: u32) -> Vec<(u32, u32)> {
     let cats_ids: Vec<i32> = select_cats();
-
-    //let cats_ids: &[i32] = &[308, 50, 145, 37, 38, 35, 51, 308, 51, 150];
     let cats: Vec<(u32, u32)> =
         gatya_data::get_cat_list_from_ids(gatya_slot_data, cats_ids.to_vec());
 
@@ -198,31 +215,32 @@ fn get_cat_slots(gatya_slot_data: Vec<Vec<i32>>, total_rares: u32) -> Vec<(u32, 
     if collisions {
         println!("WARNING: There might be a duplicate rare cat! The seed might not be found.")
     }
+
     cats
 }
 
 #[tokio::main]
 async fn main() {
     let cc: &str = &select_cc();
+
     println!();
+
     let (gatya_event, force) = select_event(cc).await;
     let unitbuy_cat_data: Vec<Vec<i32>> = gatya_data::get_unitbuy_cat_data(cc, force).await;
-    // println!("unitbuy cat data : {:?}", unitbuy_cat_data);
-
     let gatya_cat_data: Vec<Vec<i32>> = gatya_data::get_gatya_cat_data(cc, force).await;
-    // println!("gatya cat data : {:?}", gatya_cat_data);
-
     let gatya_id: i32 = gatya_event.gatya_id.parse::<i32>().unwrap();
+
     println!("gatya id : {}", gatya_id);
 
-    let gatya_slot_data: Vec<Vec<i32>> = gatya_data::get_gatya_slot_data(gatya_id, gatya_cat_data, unitbuy_cat_data);
+    let gatya_slot_data: Vec<Vec<i32>> =
+        gatya_data::get_gatya_slot_data(gatya_id, gatya_cat_data, unitbuy_cat_data);
+
     println!("gatya slot data : {:?}", gatya_slot_data);
 
     let total_rares: u32 = gatya_slot_data[0].len() as u32;
     let total_super_rares: u32 = gatya_slot_data[1].len() as u32;
     let total_uber_rares: u32 = gatya_slot_data[2].len() as u32;
     let total_legend_rares: u32 = gatya_slot_data[3].len() as u32;
-
     let legend_chance: u32 = 10000 - gatya_event.legend_rare_chance.parse::<u32>().unwrap();
     let uber_chance: u32 = legend_chance - gatya_event.uber_rare_chance.parse::<u32>().unwrap();
     let super_rare_chance: u32 =
@@ -235,19 +253,22 @@ async fn main() {
         None,
     );
     let mut cats: Vec<(u32, u32)> = Vec::new();
+
     if seek_or_find == 1 {
         cats = get_cat_slots(gatya_slot_data.clone(), total_rares);
     } else {
         let rarities: Vec<i32> = select_rarities();
+
         for rarity in rarities.iter() {
             cats.push((*rarity as u32, IGNORE_SLOT));
         }
     }
-    let slice_cats: &[(u32, u32)] = cats.as_slice();
 
+    let slice_cats: &[(u32, u32)] = cats.as_slice();
     let thread_count: i32 = get_int_from_user("Enter total threads to use (default 8): ", Some(8));
 
     println!("\nFinding seed...");
+
     let start: Instant = Instant::now();
     let seeds: Vec<u32> = find_seed(
         slice_cats,
@@ -271,14 +292,18 @@ async fn main() {
     } else {
         println!("Multiple seeds found. You need to enter more cats!");
         println!("\nSeeds: ");
+
         let max_seeds: usize = if seeds.len() > 10 { 10 } else { seeds.len() };
+
         for seed in seeds[0..max_seeds].iter() {
             println!("{}", seed);
         }
+
         if max_seeds < seeds.len() {
             println!("... and {} more", seeds.len() - max_seeds);
         }
     }
+
     println!("\nTime taken to find seed: {:?}", duration);
 }
 
@@ -300,6 +325,7 @@ fn is_collisions(cats: Vec<(u32, u32)>, total_rares: u32) -> bool {
             return true;
         }
     }
+
     false
 }
 
@@ -317,8 +343,8 @@ fn find_seed(
     let mut threads: Vec<std::thread::JoinHandle<Vec<u32>>> = Vec::new();
     let mut start_point: u32 = 1;
     let step: u32 = 0xFFFFFFFF / total_threads;
-
     let mut end_point: u32 = step;
+
     for i in 0..total_threads {
         let cats: Vec<(u32, u32)> = cats.to_vec();
         threads.push(std::thread::spawn(move || {
@@ -335,23 +361,24 @@ fn find_seed(
                 end_point,
             )
         }));
+
         if i == total_threads - 1 {
             break;
         }
+
         start_point = end_point + 1;
         end_point += step;
     }
+
     let mut seeds: Vec<u32> = Vec::new();
+
     for thread in threads {
         let mut thread_seeds: Vec<u32> = thread.join().unwrap();
         seeds.append(&mut thread_seeds);
     }
+
     seeds
 }
-const MODULUS: u32 = 10000;
-const BLANK_SLOT: u32 = 20;
-const IGNORE_SLOT: u32 = 21;
-const BLANK_SLOT_USER: i32 = -2;
 
 fn find_seed_range(
     cats: &[(u32, u32)],
@@ -366,21 +393,15 @@ fn find_seed_range(
     end_point: u32,
 ) -> Vec<u32> {
     let last_cat: usize = cats.len() - 1;
-
     let mut slot: u32;
     let mut size: u32;
-
     let mut seed: u32;
     let mut prob: u32;
-
-    // 0 - Rare
-    // 1 - Super Rare
-    // 2 - Uber Rare
-    // 3 - Legend Rare
     let mut seeds: Vec<u32> = Vec::new();
 
     for i in start_point..end_point {
         seed = i;
+
         for (j, cat) in cats.iter().enumerate() {
             seed ^= seed << 13;
             seed ^= seed >> 17;
@@ -388,26 +409,35 @@ fn find_seed_range(
             prob = seed % MODULUS;
 
             if cat.0 != BLANK_SLOT {
-                if prob < super_rare_chance {
-                    if cat.0 != 0 {
-                        break;
+                match prob {
+                    p if p < super_rare_chance => {
+                        if cat.0 != 0 {
+                            break;
+                        }
+
+                        size = total_rares;
                     }
-                    size = total_rares;
-                } else if prob < uber_chance {
-                    if cat.0 != 1 {
-                        break;
+                    p if p < uber_chance => {
+                        if cat.0 != 1 {
+                            break;
+                        }
+
+                        size = total_super_rares;
                     }
-                    size = total_super_rares;
-                } else if prob < legend_chance {
-                    if cat.0 != 2 {
-                        break;
+                    p if p < legend_chance => {
+                        if cat.0 != 2 {
+                            break;
+                        }
+
+                        size = total_uber_rares;
                     }
-                    size = total_uber_rares;
-                } else {
-                    if cat.0 != 3 {
-                        break;
+                    _ => {
+                        if cat.0 != 3 {
+                            break;
+                        }
+
+                        size = total_legend_rares;
                     }
-                    size = total_legend_rares
                 }
             } else {
                 size = 1;
@@ -417,13 +447,16 @@ fn find_seed_range(
             seed ^= seed >> 17;
             seed ^= seed << 15;
             slot = seed % size;
+
             if slot != cat.1 && cat.0 != BLANK_SLOT && cat.1 != IGNORE_SLOT {
                 break;
             }
+
             if j == last_cat {
                 seeds.push(i);
             }
         }
     }
+
     seeds
 }
